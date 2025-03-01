@@ -1,9 +1,10 @@
 from typing import List
 from fastapi import FastAPI,Depends,status,Response,HTTPException
 from pydantic import BaseModel
-from . import schemas,model
+from . import schemas,model,hashing
 from .database import engine,SessionLocal
 from sqlalchemy.orm import Session
+
 app=FastAPI()
 
 model.Base.metadata.create_all(bind=engine)
@@ -48,3 +49,19 @@ def update(id,request:schemas.Blog,db:Session=Depends(get_db)):
     db.commit()
     print(updateBlog)
     return "updated successfully"
+
+@app.post('/user',response_model=schemas.showUser)
+def create_user(request:schemas.User,db:Session=Depends(get_db)):
+    new_user=model.User(name=request.name,email=request.email,password=hashing.Hash.encrypt(request.password))
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+@app.get("/user/{id}",response_model=schemas.showUser,tags=['user'])
+def get_users(id:int,db:Session=Depends(get_db)):
+    user=db.query(model.User).filter(model.User.id==id).first()
+    if not user:
+        return {"message":"user does not exists"}
+    else:
+        return user
